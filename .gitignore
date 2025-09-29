@@ -1,0 +1,38 @@
+# Python缓存文件
+__pycache__/
+*.py[cod]
+*$py.class
+
+# 日志文件
+logs/
+*.log
+
+# 缓存目录
+cache/
+!cache/audio/.gitkeep
+
+# 测试文件
+.pytest_cache/
+
+# 环境配置
+.env
+.venv
+env/
+venv/
+ENV/
+
+# 个人配置文件
+bilibili_cookies.txt
+
+# 系统文件
+.DS_Store
+Thumbs.db
+
+# IDE配置
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# 参考项目目录
+参考项目/

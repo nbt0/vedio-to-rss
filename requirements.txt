@@ -1,0 +1,31 @@
+# 视频转RSS工具依赖包
+# Python 3.8+ 兼容
+
+# Web框架
+Flask==2.3.3
+Werkzeug==2.3.7
+
+# 视频解析核心
+yt-dlp==2023.10.13
+
+# HTTP请求
+requests==2.31.0
+
+# 日期时间处理
+python-dateutil==2.8.2
+
+# 字符编码处理
+chardet==5.2.0
+
+# URL处理
+urllib3==2.0.7
+
+# 日志增强
+coloredlogs==15.0.1
+
+# 配置文件处理
+PyYAML==6.0.1
+
+# 开发调试工具（可选）
+# watchdog==3.0.0
+# flask-cors==4.0.0
