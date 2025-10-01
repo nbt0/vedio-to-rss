@@ -18,7 +18,7 @@ class Config:
     """基础配置类"""
     
     # Flask应用配置
-    SECRET_KEY = os.environ.get('SECRET_KEY') or 'video-to-rss-secret-key-2024'
+    SECRET_KEY = os.environ.get('SECRET_KEY') or 'video-to-rss-default-key-change-in-production'
     DEBUG = True
     HOST = '0.0.0.0'
     PORT = 5000

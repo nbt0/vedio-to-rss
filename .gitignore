@@ -2,6 +2,11 @@
 __pycache__/
 *.py[cod]
 *$py.class
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
 
 # 日志文件
 logs/
@@ -15,9 +20,15 @@ cache/video/*
 
 # 测试文件
 .pytest_cache/
+test_*.py
+*_test.py
+tests/
 
 # 环境配置
 .env
+.env.local
+.env.production
+.env.development
 .venv
 env/
 venv/
@@ -25,16 +36,41 @@ ENV/
 
 # 个人配置文件
 bilibili_cookies.txt
+cookies.txt
+*.cookies
+config.json
+settings.json
+local_config.py
+
+# 临时文件
+*.tmp
+*.temp
+*.bak
+*.backup
+*.orig
+*.rej
+*~
 
 # 系统文件
 .DS_Store
 Thumbs.db
+desktop.ini
 
 # IDE配置
 .idea/
 .vscode/
 *.swp
 *.swo
+*.sublime-project
+*.sublime-workspace
+
+# 敏感数据
+*.key
+*.pem
+*.p12
+*.pfx
+secret_*
+private_*
 
 # 参考项目目录
 参考项目/

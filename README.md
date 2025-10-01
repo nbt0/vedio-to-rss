@@ -43,21 +43,21 @@
 **Windows用户：**
 ```bash
 # 克隆项目并启动
-git clone https://github.com/yourusername/video-to-rss-tool.git
+git clone https://github.com/nbt0/vedio-to-rss.git
 cd video-to-rss-tool
 start.bat
 ```
 
 **PowerShell用户：**
 ```powershell
-git clone https://github.com/yourusername/video-to-rss-tool.git; cd video-to-rss-tool; .\start.bat
+git clone https://github.com/nbt0/vedio-to-rss.git; cd vedio-to-rss; .\start.bat
 ```
 
 ### 手动安装
 
 1. **克隆项目**
 ```bash
-git clone https://github.com/yourusername/video-to-rss-tool.git
+git clone https://github.com/nbt0/vedio-to-rss.git
 cd video-to-rss-tool
 ```
 
@@ -231,7 +231,7 @@ rss_data = response.text
 
 1. **克隆项目**
    ```bash
-   git clone https://github.com/yourusername/video-to-rss-tool.git
+   git clone https://github.com/nbt0/vedio-to-rss.git
    cd video-to-rss-tool
    ```
 
@@ -292,9 +292,9 @@ rss_data = response.text
 
 ## 🔗 相关链接
 
-- [项目主页](https://github.com/yourusername/video-to-rss-tool)
-- [问题反馈](https://github.com/yourusername/video-to-rss-tool/issues)
-- [更新日志](https://github.com/yourusername/video-to-rss-tool/releases)
+- [项目主页](https://github.com/nbt0/vedio-to-rss)
+- [问题反馈](https://github.com/nbt0/vedio-to-rss/issues)
+- [更新日志](https://github.com/nbt0/vedio-to-rss/releases)
 
 ---
 

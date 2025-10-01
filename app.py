@@ -34,7 +34,7 @@ else:
 
 # 创建Flask应用
 app = Flask(__name__)
-app.config['SECRET_KEY'] = 'video-to-rss-secret-key-2024'
+app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'video-to-rss-default-key-change-in-production')
 
 # 确保必要目录存在
 os.makedirs('logs', exist_ok=True)
