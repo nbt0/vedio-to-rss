@@ -12,6 +12,7 @@
 
 import os
 from datetime import timedelta
+from utils.exceptions import ConfigError
 
 class Config:
     """基础配置类"""
@@ -246,3 +247,177 @@ def get_config(config_name=None):
     if config_name is None:
         config_name = os.environ.get('FLASK_ENV', 'default')
     return config.get(config_name, config['default'])
+
+
+def validate_config(config_obj):
+    """验证配置的有效性"""
+    try:
+        # 验证必需的目录
+        required_dirs = [config_obj.LOGS_DIR, config_obj.CACHE_DIR]
+        for dir_path in required_dirs:
+            if not os.path.exists(dir_path):
+                os.makedirs(dir_path, exist_ok=True)
+        
+        # 验证日志配置
+        if not isinstance(config_obj.LOG_MAX_BYTES, int) or config_obj.LOG_MAX_BYTES <= 0:
+            raise ConfigError("LOG_MAX_BYTES must be a positive integer")
+        
+        if not isinstance(config_obj.LOG_BACKUP_COUNT, int) or config_obj.LOG_BACKUP_COUNT < 0:
+            raise ConfigError("LOG_BACKUP_COUNT must be a non-negative integer")
+        
+        # 验证缓存配置
+        if config_obj.CACHE_CONFIG['enabled']:
+            if not isinstance(config_obj.CACHE_CONFIG['max_size'], int) or config_obj.CACHE_CONFIG['max_size'] <= 0:
+                raise ConfigError("CACHE_CONFIG.max_size must be a positive integer")
+        
+        # 验证性能配置
+        if config_obj.PERFORMANCE_CONFIG['max_concurrent_downloads'] <= 0:
+            raise ConfigError("max_concurrent_downloads must be positive")
+        
+        if config_obj.PERFORMANCE_CONFIG['download_timeout'] <= 0:
+            raise ConfigError("download_timeout must be positive")
+        
+        # 验证安全配置
+        if config_obj.SECURITY_CONFIG['rate_limit_per_minute'] <= 0:
+            raise ConfigError("rate_limit_per_minute must be positive")
+        
+        if config_obj.SECURITY_CONFIG['max_url_length'] <= 0:
+            raise ConfigError("max_url_length must be positive")
+        
+        return True
+        
+    except Exception as e:
+        raise ConfigError(f"Configuration validation failed: {str(e)}")
+
+
+def get_env_var(key, default=None, var_type=str, required=False):
+    """
+    安全地获取环境变量
+    
+    Args:
+        key: 环境变量名
+        default: 默认值
+        var_type: 变量类型 (str, int, bool, float)
+        required: 是否必需
+    
+    Returns:
+        转换后的环境变量值
+    """
+    value = os.environ.get(key, default)
+    
+    if required and value is None:
+        raise ConfigError(f"Required environment variable '{key}' is not set")
+    
+    if value is None:
+        return None
+    
+    try:
+        if var_type == bool:
+            return str(value).lower() in ('true', '1', 'yes', 'on')
+        elif var_type == int:
+            return int(value)
+        elif var_type == float:
+            return float(value)
+        else:
+            return str(value)
+    except (ValueError, TypeError) as e:
+        raise ConfigError(f"Invalid type for environment variable '{key}': {str(e)}")
+
+
+def update_config_from_env(config_obj):
+    """从环境变量更新配置"""
+    # Flask配置
+    config_obj.DEBUG = get_env_var('DEBUG', config_obj.DEBUG, bool)
+    config_obj.HOST = get_env_var('HOST', config_obj.HOST)
+    config_obj.PORT = get_env_var('PORT', config_obj.PORT, int)
+    config_obj.SECRET_KEY = get_env_var('SECRET_KEY', config_obj.SECRET_KEY)
+    
+    # 日志配置
+    config_obj.LOG_LEVEL = get_env_var('LOG_LEVEL', config_obj.LOG_LEVEL)
+    config_obj.LOG_MAX_BYTES = get_env_var('LOG_MAX_BYTES', config_obj.LOG_MAX_BYTES, int)
+    config_obj.LOG_BACKUP_COUNT = get_env_var('LOG_BACKUP_COUNT', config_obj.LOG_BACKUP_COUNT, int)
+    
+    # 缓存配置
+    cache_enabled = get_env_var('CACHE_ENABLED', config_obj.CACHE_CONFIG['enabled'], bool)
+    if cache_enabled is not None:
+        config_obj.CACHE_CONFIG['enabled'] = cache_enabled
+    
+    # 性能配置
+    max_concurrent = get_env_var('MAX_CONCURRENT_DOWNLOADS', 
+                                config_obj.PERFORMANCE_CONFIG['max_concurrent_downloads'], int)
+    if max_concurrent is not None:
+        config_obj.PERFORMANCE_CONFIG['max_concurrent_downloads'] = max_concurrent
+    
+    return config_obj
+
+
+# 配置管理器类
+class ConfigManager:
+    """配置管理器"""
+    
+    def __init__(self, config_name=None):
+        self.config_name = config_name or os.environ.get('FLASK_ENV', 'default')
+        self._config = None
+    
+    @property
+    def config(self):
+        """获取配置对象"""
+        if self._config is None:
+            self._config = get_config(self.config_name)
+            self._config = update_config_from_env(self._config)
+            validate_config(self._config)
+        return self._config
+    
+    def reload_config(self, config_name=None):
+        """重新加载配置"""
+        if config_name:
+            self.config_name = config_name
+        self._config = None
+        return self.config
+    
+    def get_setting(self, key, default=None):
+        """获取配置项"""
+        try:
+            keys = key.split('.')
+            value = self.config
+            for k in keys:
+                if hasattr(value, k):
+                    value = getattr(value, k)
+                elif isinstance(value, dict) and value is not None and k in value:
+                    value = value[k]
+                else:
+                    return default
+            return value
+        except Exception:
+            return default
+    
+    def set_setting(self, key, value):
+        """设置配置项（仅在内存中）"""
+        try:
+            keys = key.split('.')
+            config_obj = self.config
+            
+            # 导航到父级对象
+            for k in keys[:-1]:
+                if hasattr(config_obj, k):
+                    config_obj = getattr(config_obj, k)
+                elif isinstance(config_obj, dict) and config_obj is not None and k in config_obj:
+                    config_obj = config_obj[k]
+                else:
+                    raise ConfigError(f"Configuration path '{key}' not found")
+            
+            # 设置最终值
+            final_key = keys[-1]
+            if hasattr(config_obj, final_key):
+                setattr(config_obj, final_key, value)
+            elif isinstance(config_obj, dict):
+                config_obj[final_key] = value
+            else:
+                raise ConfigError(f"Cannot set configuration '{key}'")
+                
+        except Exception as e:
+            raise ConfigError(f"Failed to set configuration '{key}': {str(e)}")
+
+
+# 全局配置管理器实例
+config_manager = ConfigManager()

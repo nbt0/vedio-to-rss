@@ -7,27 +7,50 @@
 2. 提取视频信息（标题、时长、UP主等）
 3. 处理B站分P视频的特殊逻辑
 4. 获取音频文件的直链URL
+
+注意：此模块的核心功能已迁移到utils.downloaders和utils.video_downloader模块
+此模块保留是为了向后兼容，新代码应直接使用VideoDownloader类
 """
 
-import yt_dlp
 import re
 import logging
 from typing import Dict, List, Optional, Union
 from urllib.parse import urlparse
-from .bilibili_api import bilibili_api
+
+# 导入新的下载器模块
+from .video_downloader import VideoDownloader
 
 class VideoParser:
-    """视频解析器类"""
+    """
+    视频解析器类
+    
+    注意：此类的核心功能已迁移到VideoDownloader类，
+    此类保留是为了向后兼容，新代码应直接使用VideoDownloader类
+    """
     
     def __init__(self, config):
+        """
+        初始化视频解析器
+        
+        Args:
+            config: 配置对象
+        """
         self.config = config
         self.logger = logging.getLogger(__name__)
         
-        # 基础yt-dlp配置
-        self.ydl_opts = self.config.YT_DLP_OPTIONS.copy()
+        # 创建VideoDownloader实例
+        self.downloader = VideoDownloader(config)
         
     def is_supported_url(self, url: str) -> bool:
-        """检查URL是否为支持的视频平台"""
+        """
+        检查URL是否为支持的视频平台
+        
+        Args:
+            url: 视频URL
+            
+        Returns:
+            bool: 是否支持
+        """
         try:
             for platform, info in self.config.SUPPORTED_PLATFORMS.items():
                 for pattern in info['patterns']:
@@ -39,7 +62,15 @@ class VideoParser:
             return False
     
     def get_platform_type(self, url: str) -> Optional[str]:
-        """获取视频平台类型"""
+        """
+        获取视频平台类型
+        
+        Args:
+            url: 视频URL
+            
+        Returns:
+            Optional[str]: 平台类型
+        """
         try:
             for platform, info in self.config.SUPPORTED_PLATFORMS.items():
                 for pattern in info['patterns']:
@@ -51,60 +82,32 @@ class VideoParser:
             return None
     
     def parse_video(self, url: str) -> Dict:
-        """解析视频信息"""
+        """
+        解析视频信息
+        
+        Args:
+            url: 视频URL
+            
+        Returns:
+            Dict: 视频信息
+        """
         try:
-            # 检查URL是否支持
-            if not self.is_supported_url(url):
-                raise ValueError(self.config.ERROR_MESSAGES['unsupported_platform'])
-            
-            platform = self.get_platform_type(url)
-            self.logger.info(f"开始解析 {platform} 视频: {url}")
-            
-
-            
-            # 根据平台调整配置
-            ydl_opts = self._get_platform_options(platform)
-            
-            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-                # 提取视频信息
-                info = ydl.extract_info(url, download=False)
-                
-                if not info:
-                    raise ValueError(self.config.ERROR_MESSAGES['parse_error'])
-                
-                # 处理不同类型的视频
-                if 'entries' in info:
-                    # 播放列表或分P视频
-                    return self._parse_playlist(info, platform)
-                else:
-                    # 单个视频
-                    return self._parse_single_video(info, platform)
-                    
-        except yt_dlp.DownloadError as e:
-            self.logger.error(f"yt-dlp下载错误: {e}")
-            error_msg = self._parse_ytdlp_error(str(e))
-            raise ValueError(error_msg)
+            # 使用新的VideoDownloader提取视频信息
+            return self.downloader.extract_video_info(url)
         except Exception as e:
             self.logger.error(f"视频解析失败: {e}")
             raise ValueError(str(e))
     
-    def _get_platform_options(self, platform: str) -> Dict:
-        """根据平台获取特定的yt-dlp配置"""
-        opts = self.ydl_opts.copy()
-        
-        if platform == 'bilibili':
-            # B站特殊配置
-            bilibili_opts = self.config.BILIBILI_OPTIONS
-            opts.update({
-                'referer': bilibili_opts['referer'],
-                'user_agent': bilibili_opts['user_agent'],
-                'http_headers': bilibili_opts['headers'],
-            })
-        
-        return opts
-    
     def _parse_bilibili_info(self, bilibili_info: Dict) -> Dict:
-        """解析B站API返回的视频信息"""
+        """
+        解析B站API返回的视频信息（保留用于向后兼容）
+        
+        Args:
+            bilibili_info: B站API返回的信息
+            
+        Returns:
+            Dict: 处理后的视频信息
+        """
         try:
             pages = bilibili_info.get('pages', [])
             
@@ -173,95 +176,16 @@ class VideoParser:
             self.logger.error(f"B站视频信息解析失败: {e}")
             raise
     
-    def _parse_single_video(self, info: Dict, platform: str) -> Dict:
-        """解析单个视频"""
-        try:
-            # 获取最佳音频格式
-            audio_url = self._get_best_audio_url(info)
-            
-            video_info = {
-                'type': 'single',
-                'platform': platform,
-                'id': info.get('id', ''),
-                'title': info.get('title', '未知标题'),
-                'description': info.get('description', ''),
-                'uploader': info.get('uploader', '未知UP主'),
-                'upload_date': info.get('upload_date', ''),
-                'duration': info.get('duration', 0),
-                'view_count': info.get('view_count', 0),
-                'like_count': info.get('like_count', 0),
-                'webpage_url': info.get('webpage_url', ''),
-                'thumbnail': info.get('thumbnail', ''),
-                'audio_url': audio_url,
-                'formats': self._extract_audio_formats(info)
-            }
-            
-            self.logger.info(f"单视频解析成功: {video_info['title']}")
-            return video_info
-            
-        except Exception as e:
-            self.logger.error(f"单视频解析失败: {e}")
-            raise
-    
-    def _parse_playlist(self, info: Dict, platform: str) -> Dict:
-        """解析播放列表或分P视频"""
-        try:
-            entries = info.get('entries', [])
-            if not entries:
-                raise ValueError("播放列表为空")
-            
-            videos = []
-            for i, entry in enumerate(entries):
-                if entry is None:
-                    continue
-                    
-                try:
-                    # 获取音频URL
-                    audio_url = self._get_best_audio_url(entry)
-                    
-                    video_item = {
-                        'part_number': i + 1,
-                        'id': entry.get('id', ''),
-                        'title': entry.get('title', f'第{i+1}P'),
-                        'description': entry.get('description', ''),
-                        'duration': entry.get('duration', 0),
-                        'webpage_url': entry.get('webpage_url', ''),
-                        'audio_url': audio_url
-                    }
-                    
-                    videos.append(video_item)
-                    
-                except Exception as e:
-                    self.logger.warning(f"第{i+1}P解析失败: {e}")
-                    continue
-            
-            if not videos:
-                raise ValueError("没有成功解析的视频")
-            
-            playlist_info = {
-                'type': 'playlist',
-                'platform': platform,
-                'id': info.get('id', ''),
-                'title': info.get('title', '未知标题'),
-                'description': info.get('description', ''),
-                'uploader': info.get('uploader', '未知UP主'),
-                'upload_date': info.get('upload_date', ''),
-                'webpage_url': info.get('webpage_url', ''),
-                'thumbnail': info.get('thumbnail', ''),
-                'video_count': len(videos),
-                'total_duration': sum(v.get('duration', 0) for v in videos),
-                'videos': videos
-            }
-            
-            self.logger.info(f"播放列表解析成功: {playlist_info['title']}, 共{len(videos)}个视频")
-            return playlist_info
-            
-        except Exception as e:
-            self.logger.error(f"播放列表解析失败: {e}")
-            raise
-    
     def _get_best_audio_url(self, info: Dict) -> str:
-        """获取最佳音频URL"""
+        """
+        获取最佳音频URL（保留用于向后兼容）
+        
+        Args:
+            info: 视频信息
+            
+        Returns:
+            str: 音频URL
+        """
         try:
             formats = info.get('formats', [])
             if not formats:
@@ -294,7 +218,15 @@ class VideoParser:
             return info.get('url', '')
     
     def _extract_audio_formats(self, info: Dict) -> List[Dict]:
-        """提取可用的音频格式信息"""
+        """
+        提取可用的音频格式信息（保留用于向后兼容）
+        
+        Args:
+            info: 视频信息
+            
+        Returns:
+            List[Dict]: 音频格式列表
+        """
         try:
             formats = info.get('formats', [])
             audio_formats = []
@@ -319,7 +251,15 @@ class VideoParser:
             return []
     
     def _parse_ytdlp_error(self, error_msg: str) -> str:
-        """解析yt-dlp错误消息"""
+        """
+        解析yt-dlp错误消息（保留用于向后兼容）
+        
+        Args:
+            error_msg: 错误消息
+            
+        Returns:
+            str: 处理后的错误消息
+        """
         error_msg_lower = error_msg.lower()
         
         if 'network' in error_msg_lower or 'connection' in error_msg_lower:
@@ -338,32 +278,43 @@ class VideoParser:
             return self.config.ERROR_MESSAGES['parse_error']
     
     def get_video_info_only(self, url: str) -> Dict:
-        """仅获取视频基本信息，不提取音频URL（用于快速预览）"""
+        """
+        仅获取视频基本信息，不提取音频URL（用于快速预览）
+        
+        Args:
+            url: 视频URL
+            
+        Returns:
+            Dict: 视频基本信息
+        """
         try:
-            if not self.is_supported_url(url):
-                raise ValueError(self.config.ERROR_MESSAGES['unsupported_platform'])
+            # 使用新的VideoDownloader提取视频信息
+            info = self.downloader.extract_video_info(url)
             
-            platform = self.get_platform_type(url)
-            ydl_opts = self._get_platform_options(platform)
-            ydl_opts.update({
-                'extract_flat': True,  # 快速提取
-                'quiet': True
-            })
+            # 提取基本信息
+            basic_info = {
+                'title': info.get('title', '未知标题'),
+                'uploader': info.get('uploader', '未知UP主'),
+                'duration': info.get('duration', 0),
+                'view_count': info.get('view_count', 0),
+                'upload_date': info.get('upload_date', ''),
+                'platform': info.get('platform', self._get_platform_from_url(url))
+            }
             
-            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-                info = ydl.extract_info(url, download=False)
-                
-                basic_info = {
-                    'title': info.get('title', '未知标题'),
-                    'uploader': info.get('uploader', '未知UP主'),
-                    'duration': info.get('duration', 0),
-                    'view_count': info.get('view_count', 0),
-                    'upload_date': info.get('upload_date', ''),
-                    'platform': platform
-                }
-                
-                return basic_info
+            return basic_info
                 
         except Exception as e:
             self.logger.error(f"获取视频基本信息失败: {e}")
             raise ValueError(str(e))
+            
+    def _get_platform_from_url(self, url: str) -> str:
+        """
+        从URL获取平台名称
+        
+        Args:
+            url: 视频URL
+            
+        Returns:
+            str: 平台名称
+        """
+        return self.downloader._get_platform_from_url(url)

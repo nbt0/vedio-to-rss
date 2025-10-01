@@ -44,6 +44,15 @@ class RSSGenerator:
                 # 处理音频URL
                 self._process_audio_urls(video_info, audio_url_mode, base_url)
             
+            # 确保video_info包含type字段
+            if 'type' not in video_info:
+                # 根据结构判断类型
+                if 'videos' in video_info and isinstance(video_info['videos'], list):
+                    video_info['type'] = 'playlist'
+                else:
+                    video_info['type'] = 'single'
+                self.logger.info(f"自动设置视频类型为: {video_info['type']}")
+            
             if video_info['type'] == 'single':
                 return self._generate_single_video_rss(video_info)
             elif video_info['type'] == 'playlist':
@@ -294,18 +303,26 @@ class RSSGenerator:
                 pub_date.text = self._format_rfc822_date(datetime.now(timezone.utc))
             
             # 音频附件（关键部分）
-            if video_info.get('audio_url'):
+            audio_url = video_info.get('audio_url')
+            if not audio_url:
+                # 如果没有直接的audio_url，尝试从formats中提取
+                formats = video_info.get('formats', [])
+                for fmt in formats:
+                    if fmt.get('acodec') != 'none' and fmt.get('url'):
+                        audio_url = fmt['url']
+                        break
+            
+            if audio_url:
                 enclosure = ET.SubElement(item, 'enclosure')
-                enclosure.set('url', video_info['audio_url'])
+                enclosure.set('url', audio_url)
                 enclosure.set('type', 'audio/mpeg')
-                # 尝试获取文件大小，如果没有则设置为0
-                file_size = '0'
-                if video_info.get('formats'):
-                    for fmt in video_info['formats']:
-                        if fmt.get('url') == video_info['audio_url'] and fmt.get('filesize'):
-                            file_size = str(fmt['filesize'])
-                            break
-                enclosure.set('length', file_size)
+                enclosure.set('length', '0')
+            else:
+                # 如果没有音频URL，添加默认enclosure
+                enclosure = ET.SubElement(item, 'enclosure')
+                enclosure.set('url', '')
+                enclosure.set('type', 'audio/mpeg')
+                enclosure.set('length', '0')
             
             # iTunes标签
             itunes_author = ET.SubElement(item, 'itunes:author')

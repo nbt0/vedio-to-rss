@@ -8,8 +8,10 @@ logs/
 *.log
 
 # 缓存目录
-cache/
+cache/audio/*
+cache/video/*
 !cache/audio/.gitkeep
+!cache/video/.gitkeep
 
 # 测试文件
 .pytest_cache/

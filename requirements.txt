@@ -6,7 +6,7 @@ Flask==2.3.3
 Werkzeug==2.3.7
 
 # 视频解析核心
-yt-dlp==2023.10.13
+yt-dlp>=2024.08.12
 
 # HTTP请求
 requests==2.31.0
